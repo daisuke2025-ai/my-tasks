@@ -27,6 +27,9 @@
         /><button type="submit">ログイン</button>
       </form>
       <button type="button" id="signupButton">新規アカウント登録</button>
+      <button type="button" id="forgotPasswordButton" class="account-link">
+        パスワードを忘れた方
+      </button>
       <p id="authMessage" role="status"></p>
       <button type="button" id="guestContinueButton" class="guest-button">
         ゲストとして続ける
@@ -37,6 +40,8 @@
         <span id="userEmail"></span>
         <div class="account-actions">
           <button type="button" id="loginOpenButton">ログインして同期</button
+          ><button type="button" id="changePasswordButton" hidden>
+            パスワード変更</button
           ><button type="button" id="logoutButton" hidden>ログアウト</button>
         </div>
       </div>
@@ -146,6 +151,70 @@
         <div id="sharedCategories"></div>
       </section>
     </main>
+    <div id="passwordOverlay" class="password-overlay" hidden>
+      <div
+        class="password-panel"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="passwordDialogTitle"
+      >
+        <div class="password-heading">
+          <h2 id="passwordDialogTitle">パスワード変更</h2>
+          <button type="button" id="closePasswordButton" aria-label="閉じる">
+            ×
+          </button>
+        </div>
+        <p id="passwordDescription"></p>
+        <form id="passwordForm">
+          <label for="newPassword">新しいパスワード（8文字以上）</label>
+          <input
+            id="newPassword"
+            type="password"
+            autocomplete="new-password"
+            minlength="8"
+            required
+          />
+          <label for="confirmPassword">新しいパスワード（確認）</label>
+          <input
+            id="confirmPassword"
+            type="password"
+            autocomplete="new-password"
+            minlength="8"
+            required
+          />
+          <button type="submit" id="savePasswordButton">
+            パスワードを保存
+          </button>
+        </form>
+        <p id="passwordMessage" role="status" aria-live="polite"></p>
+      </div>
+    </div>
+    <div id="resetRequestOverlay" class="password-overlay" hidden>
+      <div
+        class="password-panel"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="resetRequestTitle"
+      >
+        <div class="password-heading">
+          <h2 id="resetRequestTitle">パスワードを再設定</h2>
+          <button
+            type="button"
+            id="closeResetRequestButton"
+            aria-label="閉じる"
+          >
+            ×
+          </button>
+        </div>
+        <p>登録したメールアドレスに再設定リンクを送信します。</p>
+        <form id="resetRequestForm">
+          <label for="resetEmail">メールアドレス</label>
+          <input id="resetEmail" type="email" autocomplete="email" required />
+          <button type="submit" id="sendResetButton">再設定メールを送信</button>
+        </form>
+        <p id="resetRequestMessage" role="status" aria-live="polite"></p>
+      </div>
+    </div>
     <div id="editOverlay" class="edit-overlay" hidden>
       <div class="edit-panel">
         <div class="edit-header">
