@@ -1,4 +1,4 @@
-const CACHE = "my-tasks-shell-v8-members-2";
+const CACHE = "my-tasks-shell-v9-password-1";
 const SHELL = [
   "./",
   "./index.html",
