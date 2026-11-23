@@ -75,10 +75,12 @@ function restoreViewSettings() {
   selectedStatus =
     currentView === "organized" ? "active" : state.status || "all";
   currentSort =
-    currentView === "organized" && !["dateAsc", "priority"].includes(state.sort)
+    currentView === "organized" &&
+    !["dateAsc", "priority", "categoryOrder"].includes(state.sort)
       ? "dateAsc"
       : state.sort || "created";
   categoryFilter.value = selectedCategory;
+  window.updateSharedSectionVisibility?.();
   dateFilter.value = selectedDateFilter;
   statusFilter.value = selectedStatus;
   sortSelect.replaceChildren();
@@ -87,12 +89,14 @@ function restoreViewSettings() {
       ? [
           ["dateAsc", "期限が近い順"],
           ["priority", "優先度順"],
+          ["categoryOrder", "カテゴリー順"],
         ]
       : [
           ["created", "登録順"],
           ["dateAsc", "期限が近い順"],
           ["dateDesc", "期限が遠い順"],
           ["priority", "優先度順"],
+          ["categoryOrder", "カテゴリー順"],
           ["completedAt", "完了順"],
         ];
   for (const [value, label] of options) {
@@ -123,6 +127,7 @@ function rememberViewSettings() {
 }
 let tasks = [],
   categories = [],
+  categoryRecords = [],
   activeUserId = null,
   busy = false,
   loadVersion = 0;
@@ -475,15 +480,57 @@ function scheduleSync() {
   clearTimeout(syncTimer);
   syncTimer = setTimeout(() => syncCloud(), 600);
 }
+function orderedCategoryRows(rows) {
+  return [...rows].sort((a, b) => {
+    const aPos = Number.isInteger(a.sort_order)
+      ? a.sort_order
+      : Number.MAX_SAFE_INTEGER;
+    const bPos = Number.isInteger(b.sort_order)
+      ? b.sort_order
+      : Number.MAX_SAFE_INTEGER;
+    return (
+      aPos - bPos ||
+      String(a.created_at || "").localeCompare(String(b.created_at || "")) ||
+      String(a.id).localeCompare(String(b.id))
+    );
+  });
+}
+function loadCategoryRows(rows) {
+  categoryRecords = orderedCategoryRows(rows);
+  categories = categoryRecords.map((row) => row.name);
+}
+async function moveCategory(fromName, toName) {
+  if (busy || fromName === toName) return;
+  const records = [...categoryRecords];
+  const from = records.findIndex((row) => row.name === fromName);
+  const to = records.findIndex((row) => row.name === toName);
+  if (from < 0 || to < 0) return;
+  const [moved] = records.splice(from, 1);
+  records.splice(to, 0, moved);
+  await mutate(async () => {
+    for (let i = 0; i < records.length; i++) {
+      ensureResult(
+        await client()
+          .from("categories")
+          .update({ sort_order: i + 1 })
+          .eq("id", records[i].id)
+          .eq("user_id", activeUserId),
+      );
+    }
+  });
+}
 function reloadLocal() {
   const data = readLocalStore();
   tasks = data.tasks.map(toTask);
-  categories = data.categories.map((row) => row.name);
+  loadCategoryRows(data.categories);
   renderAll();
   updateSyncStatus();
 }
 syncNowButton.addEventListener("click", () => syncCloud());
-window.addEventListener("online", () => scheduleSync());
+window.addEventListener("online", () => {
+  scheduleSync();
+  window.refreshSharedPanel?.();
+});
 window.addEventListener("focus", () => scheduleSync());
 document.addEventListener("visibilitychange", () => {
   if (!document.hidden) scheduleSync();
@@ -494,7 +541,7 @@ setInterval(() => {
 function reloadGuest() {
   const data = readGuest();
   tasks = data.tasks.map(toTask);
-  categories = data.categories.map((row) => row.name);
+  loadCategoryRows(data.categories);
   renderAll();
 }
 async function importGuestToCloud(userId) {
@@ -658,7 +705,13 @@ function taskRow(t) {
   };
 }
 function categoryRow(name) {
-  return { user_id: activeUserId, name };
+  return {
+    user_id: activeUserId,
+    name,
+    sort_order: categoryRecords.some((row) => row.sort_order == null)
+      ? null
+      : Math.max(0, ...categoryRecords.map((row) => row.sort_order || 0)) + 1,
+  };
 }
 function ensureResult(result) {
   if (result.error) throw result.error;
@@ -672,7 +725,9 @@ window.setCloudUser = async function (user) {
   activeUserId = id;
   tasks = [];
   categories = [];
+  categoryRecords = [];
   renderAll();
+  window.clearSharedData?.();
   if (!id) {
     reloadGuest();
     updateSyncStatus();
@@ -692,6 +747,7 @@ window.setCloudUser = async function (user) {
     await syncCloud();
     if (activeUserId === id && readJson(baseKey(id), null))
       await importGuestToCloud(id);
+    window.refreshSharedPanel?.();
   } else updateSyncStatus("オフライン：端末に保存・同期待ち");
 };
 async function mutate(work) {
@@ -745,6 +801,7 @@ for (const b of tabButtons)
     restoreViewSettings();
     saveSettings();
     renderTasks();
+    window.updateSharedSectionVisibility?.();
   });
 categoryFilter.addEventListener("change", () => {
   selectedCategory = categoryFilter.value;
@@ -774,8 +831,11 @@ completedLast.addEventListener("change", () => {
 function matchesFilters(t) {
   if (currentView === "inbox") return !t.category && !t.completed;
   if (currentView === "organized" && (!t.category || t.completed)) return false;
-  if (selectedCategory !== "all" && (t.category || "") !== selectedCategory)
-    return false;
+  if (selectedCategory !== "all") {
+    if (t._shared) {
+      if (selectedCategory !== "shared:" + t._shared.category.id) return false;
+    } else if ((t.category || "") !== selectedCategory) return false;
+  }
   if (currentView === "all") {
     if (selectedStatus === "active" && t.completed) return false;
     if (selectedStatus === "completed" && !t.completed) return false;
@@ -909,16 +969,56 @@ function renderCategories() {
         rememberViewSettings();
       });
     });
-    li.append(label, edit, del);
+    const controls = document.createElement("span");
+    controls.className = "category-move-controls";
+    const index = categories.indexOf(category);
+    for (const [symbol, offset, description] of [
+      ["↑", -1, "上へ"],
+      ["↓", 1, "下へ"],
+    ]) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "category-move-button";
+      button.textContent = symbol;
+      button.title = `${category}を${description}移動`;
+      button.setAttribute("aria-label", button.title);
+      button.disabled =
+        index + offset < 0 || index + offset >= categories.length;
+      button.addEventListener("click", () =>
+        moveCategory(category, categories[index + offset]),
+      );
+      controls.append(button);
+    }
+    li.draggable = true;
+    li.dataset.categoryName = category;
+    li.addEventListener("dragstart", (event) => {
+      event.dataTransfer.setData("text/plain", category);
+      event.dataTransfer.effectAllowed = "move";
+      li.classList.add("dragging");
+    });
+    li.addEventListener("dragend", () => li.classList.remove("dragging"));
+    li.addEventListener("dragover", (event) => {
+      event.preventDefault();
+      event.dataTransfer.dropEffect = "move";
+    });
+    li.addEventListener("drop", (event) => {
+      event.preventDefault();
+      const source = event.dataTransfer.getData("text/plain");
+      if (categories.includes(source)) moveCategory(source, category);
+    });
+    li.append(label, controls, edit, del);
     categoryList.append(li);
   }
+  window.renderShareButtons?.();
 }
 function renderCategoryFilter() {
   categoryFilter.replaceChildren();
+  const sharedOptions = window.getSharedCategoryOptions?.() || [];
   for (const [value, label] of [
     ["all", "すべてのカテゴリー"],
     ["", "未分類"],
     ...categories.map((x) => [x, x]),
+    ...sharedOptions,
   ]) {
     const opt = document.createElement("option");
     opt.value = value;
@@ -1025,7 +1125,10 @@ function renderTasks() {
     organized: "タスク一覧",
     all: "すべてのタスク",
   }[currentView];
-  const visible = tasks.filter(matchesFilters);
+  const visible = [
+    ...tasks,
+    ...(currentView === "inbox" ? [] : window.getSharedTaskRows?.() || []),
+  ].filter(matchesFilters);
   if (currentView !== "inbox" && currentSort !== "created")
     visible.sort((a, b) => {
       if (currentSort === "completedAt") {
@@ -1037,6 +1140,16 @@ function renderTasks() {
           if (byCompletion) return byCompletion;
         }
         return (b.createdAt || "").localeCompare(a.createdAt || "");
+      }
+      if (currentSort === "categoryOrder") {
+        const position = new Map(categories.map((name, i) => [name, i]));
+        const aPosition = position.get(a.category) ?? Number.MAX_SAFE_INTEGER;
+        const bPosition = position.get(b.category) ?? Number.MAX_SAFE_INTEGER;
+        if (aPosition !== bPosition) return aPosition - bPosition;
+        return (
+          (a.date || "9999-12-31").localeCompare(b.date || "9999-12-31") ||
+          (a.createdAt || "").localeCompare(b.createdAt || "")
+        );
       }
       if (currentSort === "priority") {
         const difference =
@@ -1071,7 +1184,17 @@ function renderTasks() {
     check.type = "checkbox";
     check.checked = t.completed;
     check.className = "task-checkbox";
+    check.disabled = !!t._shared && t._shared.role !== "editor";
     check.addEventListener("change", async () => {
+      if (t._shared) {
+        try {
+          await window.updateSharedTaskCompletion(t, check.checked);
+        } catch (error) {
+          reportError(error);
+          check.checked = !check.checked;
+        }
+        return;
+      }
       if (
         t.completed &&
         !check.checked &&
@@ -1110,6 +1233,14 @@ function renderTasks() {
       details.append(el);
     };
     [t.category, t.date, t.time].forEach((x) => tag(x));
+    if (t._shared) {
+      const sharedTag = document.createElement("span");
+      sharedTag.className = "shared-task-indicator";
+      sharedTag.innerHTML =
+        '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg><span>共有</span>';
+      sharedTag.title = t._shared.role === "editor" ? "共同編集" : "閲覧のみ";
+      details.prepend(sharedTag);
+    }
     if (getRepeat(t) !== "none")
       tag("🔁 " + repeatLabels[getRepeat(t)], "repeat-label");
     if (isOverdue(t)) tag("期限切れ", "overdue-label");
@@ -1126,11 +1257,20 @@ function renderTasks() {
     const edit = document.createElement("button");
     edit.className = "edit-button";
     edit.textContent = "編集";
-    edit.addEventListener("click", () => openEditor(t));
+    edit.disabled = !!t._shared && t._shared.role !== "editor";
+    edit.addEventListener("click", () =>
+      t._shared ? window.openSharedTaskEditor(t) : openEditor(t),
+    );
     const del = document.createElement("button");
     del.className = "delete-button";
     del.textContent = "削除";
+    del.disabled = !!t._shared && t._shared.role !== "editor";
     del.addEventListener("click", () => {
+      if (t._shared) {
+        if (confirm("この共有タスクを削除しますか？"))
+          window.deleteSharedTask(t).catch(reportError);
+        return;
+      }
       if (confirm("このタスクを削除しますか？"))
         mutate(async () =>
           ensureResult(
