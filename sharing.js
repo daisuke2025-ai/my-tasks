@@ -10,6 +10,13 @@
   const sharedKey = (c) => "shared:" + c.id;
   window.getSharedCategoryOptions = () =>
     [...sharedCategories]
+      .filter(
+        () =>
+          !(
+            currentView === "organized" &&
+            document.getElementById("excludeShared")?.checked
+          ),
+      )
       .sort(
         (a, b) =>
           (a.role === "editor" ? 0 : 1) - (b.role === "editor" ? 0 : 1) ||
@@ -590,6 +597,17 @@
         ...c,
         role: shares.find((s) => s.category_id === c.id)?.role || "viewer",
       }));
+      // Only categories currently shared with the signed-in user are returned by this RPC.
+      const memberRows = unwrap(
+        await db.rpc("my_tasks_shared_category_members"),
+      );
+      if (token !== epoch) return;
+      const membersByCategory = new Map();
+      for (const member of memberRows || []) {
+        if (!membersByCategory.has(member.category_id))
+          membersByCategory.set(member.category_id, []);
+        membersByCategory.get(member.category_id).push(member);
+      }
       await refreshSharedRows();
       if (token !== epoch) return;
       window.updateSharedSectionVisibility();
@@ -599,6 +617,59 @@
         const heading = el(
           "h3",
           `${category.name}（${share.role === "editor" ? "共同編集" : "閲覧のみ"}）`,
+        );
+        const memberList = el("div", undefined, "share-member-summary");
+        const categoryMembers = membersByCategory.get(category.id) || [];
+        const owner = categoryMembers.find((m) => m.member_role === "owner");
+        const ownerRow = el(
+          "p",
+          "所有者：" + (owner?.member_email || "取得できません"),
+          "share-owner-email",
+        );
+        memberList.append(ownerRow);
+        for (const [role, label] of [
+          ["viewer", "共有（閲覧のみ）"],
+          ["editor", "共有（共同編集）"],
+        ]) {
+          const users = categoryMembers.filter((m) => m.member_role === role);
+          if (!users.length) continue;
+          const group = el("div", undefined, "share-member-group");
+          group.append(el("p", label, "share-member-group-title"));
+          for (const member of users)
+            group.append(el("p", member.member_email, "share-member-email"));
+          memberList.append(group);
+        }
+        const leave = btn(
+          "共有を辞退する",
+          async () => {
+            if (
+              !confirm(
+                `「${category.name}」の共有を辞退しますか？\nこのカテゴリーの共有タスクが見られなくなります。共有元のタスクは削除されません。`,
+              )
+            )
+              return;
+            leave.disabled = true;
+            try {
+              requireOnline();
+              const me = await currentUser();
+              if (!me || me.id !== activeUserId)
+                throw new Error("ログイン状態を確認してください");
+              unwrap(
+                await db
+                  .from("category_shares")
+                  .delete()
+                  .eq("category_id", category.id)
+                  .eq("user_id", me.id)
+                  .select("id"),
+              );
+              // Re-fetch, rather than retaining stale shared tasks after revocation.
+              await window.refreshSharedPanel();
+            } catch (e) {
+              showError(e);
+              leave.disabled = false;
+            }
+          },
+          "share-leave-button",
         );
         const refresh = btn("更新", () =>
           loadSharedTasks(card, category, share.role, category.user_id).catch(
@@ -624,8 +695,10 @@
         sortLabel.append(sortSelect);
         card.append(
           heading,
+          memberList,
           refresh,
           sortLabel,
+          leave,
           el("div", undefined, "share-tasks"),
         );
         container.append(card);
