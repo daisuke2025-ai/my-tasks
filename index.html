@@ -120,6 +120,10 @@
       </button>
       <section class="category-section" id="categorySection" hidden>
         <h2>カテゴリー管理</h2>
+        <p class="category-order-hint">
+          ドラッグして並べ替え（スマホでは ↑ ↓
+          を使用）。「カテゴリー順」ソートにも反映されます。
+        </p>
         <form id="categoryForm">
           <input
             type="text"
@@ -129,6 +133,14 @@
           /><button type="submit">追加</button>
         </form>
         <ul id="categoryList"></ul>
+      </section>
+      <section id="sharedSection" class="shared-section" hidden>
+        <h2>共有されたカテゴリー</h2>
+        <p class="repeat-hint">
+          共有タスクはオンライン時のみ表示・編集できます。
+        </p>
+        <div id="sharedStatus" role="status"></div>
+        <div id="sharedCategories"></div>
       </section>
     </main>
     <div id="editOverlay" class="edit-overlay" hidden>
@@ -178,5 +190,6 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <script src="script.js"></script>
     <script src="auth.js"></script>
+    <script src="sharing.js"></script>
   </body>
 </html>
