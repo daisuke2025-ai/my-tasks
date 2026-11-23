@@ -1,10 +1,11 @@
-const CACHE = "my-tasks-shell-v3-2";
+const CACHE = "my-tasks-shell-v7-1";
 const SHELL = [
   "./",
   "./index.html",
   "./style.css",
   "./script.js",
   "./auth.js",
+  "./sharing.js",
   "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js",
 ];
 self.addEventListener("install", (event) => {
@@ -32,7 +33,9 @@ self.addEventListener("fetch", (event) => {
   const local =
     url.origin === self.location.origin &&
     (url.pathname.endsWith("/") ||
-      /\/(index\.html|style\.css|script\.js|auth\.js)$/.test(url.pathname));
+      /\/(index\.html|style\.css|script\.js|auth\.js|sharing\.js)$/.test(
+        url.pathname,
+      ));
   const library =
     url.hostname === "cdn.jsdelivr.net" &&
     url.pathname.includes("/@supabase/supabase-js@2/dist/umd/supabase.min.js");
