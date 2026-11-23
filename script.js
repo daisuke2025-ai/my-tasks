@@ -29,7 +29,9 @@ const editDate = $("editDate"),
   filterPanel = $("filterPanel"),
   sortField = $("sortField"),
   statusField = $("statusField"),
-  completedLastRow = $("completedLastRow");
+  completedLastRow = $("completedLastRow"),
+  excludeSharedRow = $("excludeSharedRow"),
+  excludeShared = $("excludeShared");
 let currentView = "inbox",
   selectedCategory = "all",
   selectedStatus = "all";
@@ -71,6 +73,12 @@ function saveSettings() {
 function restoreViewSettings() {
   const state = viewSettings[currentView];
   selectedCategory = state.category || "all";
+  if (
+    currentView === "organized" &&
+    document.getElementById("excludeShared")?.checked &&
+    selectedCategory.startsWith("shared:")
+  )
+    selectedCategory = "all";
   selectedDateFilter = state.date || "all";
   selectedStatus =
     currentView === "organized" ? "active" : state.status || "all";
@@ -110,6 +118,7 @@ function restoreViewSettings() {
   sortField.hidden = currentView === "inbox";
   statusField.hidden = currentView !== "all";
   completedLastRow.hidden = currentView !== "all";
+  excludeSharedRow.hidden = currentView !== "organized";
   categorySection.hidden = currentView !== "all";
   clearCompletedButton.hidden = currentView !== "all";
   tabButtons.forEach((b) =>
@@ -828,7 +837,21 @@ completedLast.addEventListener("change", () => {
   localStorage.setItem("completedLast", String(completedLast.checked));
   renderTasks();
 });
+excludeShared.checked =
+  localStorage.getItem("myTasksExcludeSharedV1") === "true";
+excludeShared.addEventListener("change", () => {
+  localStorage.setItem("myTasksExcludeSharedV1", String(excludeShared.checked));
+  if (excludeShared.checked && selectedCategory.startsWith("shared:")) {
+    selectedCategory = "all";
+    categoryFilter.value = "all";
+    rememberViewSettings();
+  }
+  renderCategoryFilter();
+  renderTasks();
+});
 function matchesFilters(t) {
+  if (currentView === "organized" && excludeShared.checked && t._shared)
+    return false;
   if (currentView === "inbox") return !t.category && !t.completed;
   if (currentView === "organized" && (!t.category || t.completed)) return false;
   if (selectedCategory !== "all") {
