@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>My Tasks</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <section id="authSection" class="auth-section" hidden>
+      <h2>My Tasks にログイン</h2>
+      <p>アカウントを作成してタスクを管理しよう！</p>
+      <form id="authForm">
+        <input
+          type="email"
+          id="authEmail"
+          placeholder="メールアドレス"
+          autocomplete="email"
+          required
+        /><input
+          type="password"
+          id="authPassword"
+          placeholder="パスワード（8文字以上）"
+          autocomplete="current-password"
+          minlength="8"
+          required
+        /><button type="submit">ログイン</button>
+      </form>
+      <button type="button" id="signupButton">新規アカウント登録</button>
+      <p id="authMessage" role="status"></p>
+      <button type="button" id="guestContinueButton" class="guest-button">
+        ゲストとして続ける
+      </button>
+    </section>
+    <main class="app" hidden>
+      <div id="userPanel" hidden>
+        <span id="userEmail"></span>
+        <div class="account-actions">
+          <button type="button" id="loginOpenButton">ログインして同期</button
+          ><button type="button" id="logoutButton" hidden>ログアウト</button>
+        </div>
+      </div>
+      <div class="sync-bar">
+        <span id="syncIndicator" role="status">準備中…</span
+        ><button type="button" id="syncNowButton" hidden>今すぐ同期</button>
+      </div>
+      <h1>My Tasks</h1>
+      <p>今日も少しずつ進めよう！</p>
+      <form id="taskForm">
+        <input
+          type="text"
+          id="taskInput"
+          placeholder="新しいタスクを入力"
+          required
+        /><button type="submit">追加</button>
+      </form>
+      <div class="tabs">
+        <button type="button" class="tab-button active" data-view="inbox">
+          Inbox</button
+        ><button type="button" class="tab-button" data-view="organized">
+          タスク一覧</button
+        ><button type="button" class="tab-button" data-view="all">
+          すべて
+        </button>
+      </div>
+      <h2 id="viewTitle">Inbox</h2>
+      <div class="filter-panel" id="filterPanel">
+        <div class="filter-field">
+          <label for="categoryFilter">カテゴリー</label
+          ><select id="categoryFilter">
+            <option value="all">すべてのカテゴリー</option>
+          </select>
+        </div>
+        <div class="filter-field" id="statusField">
+          <label for="statusFilter">完了状態</label
+          ><select id="statusFilter">
+            <option value="all">すべて</option>
+            <option value="active">未完了</option>
+            <option value="completed">完了済み</option>
+          </select>
+        </div>
+        <div class="filter-field" id="sortField">
+          <label for="sortSelect">並べ替え</label
+          ><select id="sortSelect">
+            <option value="created">登録順</option>
+            <option value="dateAsc">期限が近い順</option>
+            <option value="dateDesc">期限が遠い順</option>
+            <option value="priority">優先度順</option>
+          </select>
+        </div>
+        <div class="filter-field">
+          <label for="dateFilter">日付</label
+          ><select id="dateFilter">
+            <option value="all">すべての日付</option>
+            <option value="today">当日</option>
+            <option value="overdue">期限超過</option>
+          </select>
+        </div>
+      </div>
+      <label class="setting-row" id="completedLastRow"
+        ><input
+          type="checkbox"
+          id="completedLast"
+        />完了済みタスクを下に表示する</label
+      >
+      <p id="taskCount" class="task-count"></p>
+      <div id="bulkActions" class="bulk-actions" hidden>
+        <button type="button" id="moveOverdueButton">
+          期限超過タスクを今日に変更
+        </button>
+      </div>
+      <ul id="taskList"></ul>
+      <button
+        type="button"
+        id="clearCompletedButton"
+        class="danger-action"
+        hidden
+      >
+        完了済みタスクを一括削除
+      </button>
+      <section class="category-section" id="categorySection" hidden>
+        <h2>カテゴリー管理</h2>
+        <form id="categoryForm">
+          <input
+            type="text"
+            id="categoryInput"
+            placeholder="新しいカテゴリー"
+            required
+          /><button type="submit">追加</button>
+        </form>
+        <ul id="categoryList"></ul>
+      </section>
+    </main>
+    <div id="editOverlay" class="edit-overlay" hidden>
+      <div class="edit-panel">
+        <div class="edit-header">
+          <h2>タスクを編集</h2>
+          <button type="button" id="closeEditButton" class="close-button">
+            ×
+          </button>
+        </div>
+        <form id="editForm">
+          <label for="editTitle">タスク名</label
+          ><input type="text" id="editTitle" required /><label
+            for="editCategory"
+            >カテゴリー</label
+          ><select id="editCategory"></select
+          ><label for="editPriority">優先度</label
+          ><select id="editPriority">
+            <option value="1">P1：超重要（赤）</option>
+            <option value="2">P2：重要（黄）</option>
+            <option value="3">P3：やや重要（青）</option>
+            <option value="4" selected>P4：通常（フラグなし）</option></select
+          ><label for="editDate">日付</label
+          ><input type="date" id="editDate" /><label for="editTime"
+            >時刻（任意）</label
+          ><input type="time" id="editTime" /><label for="editRepeat"
+            >繰り返し</label
+          ><select id="editRepeat">
+            <option value="none">繰り返しなし</option>
+            <option value="daily">毎日</option>
+            <option value="weekdays">平日のみ</option>
+            <option value="weekly">毎週</option>
+            <option value="monthly">毎月</option>
+          </select>
+          <p class="repeat-hint">
+            ルーティンはタスクを完了したときに次回分を1件だけ作成します。
+          </p>
+          <div class="edit-actions">
+            <button type="submit">保存する</button
+            ><button type="button" id="cancelEditButton" class="cancel-button">
+              キャンセル
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+    <script src="script.js"></script>
+    <script src="auth.js"></script>
+  </body>
+</html>
