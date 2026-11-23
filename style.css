@@ -590,3 +590,47 @@ button:hover {
   opacity: 0.35;
   cursor: not-allowed;
 }
+
+.share-owner-email {
+  font-size: 0.85rem;
+  color: #52616b;
+  overflow-wrap: anywhere;
+  margin: 6px 0 10px;
+}
+.share-leave-button {
+  margin: 8px 0 12px;
+  background: #fff;
+  color: #b42332;
+  border: 1px solid #dc9aa2;
+  border-radius: 7px;
+  padding: 7px 12px;
+  cursor: pointer;
+}
+.share-leave-button:hover {
+  background: #fff1f2;
+}
+.share-leave-button:disabled {
+  opacity: 0.5;
+  cursor: wait;
+}
+
+/* Stage 8: shared category member list */
+.share-member-summary {
+  margin: 10px 0;
+  padding: 10px 12px;
+  background: #f4faf9;
+  border-radius: 9px;
+  overflow-wrap: anywhere;
+}
+.share-member-group {
+  margin-top: 9px;
+}
+.share-member-group-title {
+  font-weight: 700;
+  font-size: 0.9rem;
+  margin: 0 0 4px;
+}
+.share-member-email {
+  margin: 3px 0 3px 12px;
+  font-size: 0.9rem;
+}
